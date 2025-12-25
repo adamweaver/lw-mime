@@ -106,7 +106,7 @@ ADDITIONAL-CHARS-TO-ENCODE represents other chars which should be encoded (e.g. 
           (if (eq encoding :quoted-printable) #\Q #\B)
           (if (eq encoding :quoted-printable)
               (nsubstitute #\_ #\Space (encode-quoted-printable string #\?))
-              (crypto:encode-base-64 string))))
+              (base64:encode-base-64 string))))
 
 (defun decode-encoded-word (string)
   "Convert STRING from 'encoded-word' format into a UTF-8 string"
@@ -116,7 +116,7 @@ ADDITIONAL-CHARS-TO-ENCODE represents other chars which should be encoded (e.g. 
                (strcat (or prefix "")
                        (ef:decode-external-string (if (char-equal (char decoder 0) #\q)
                                                       (decode-quoted-printable text)
-                                                      (crypto:decode-base-64 text))
+                                                      (base64:decode-base-64 text))
                                                   encoding)
                        (or (and rest (maybe-decode-encoded-word (delete-if #'lwsp rest))) ""))
                string)))
