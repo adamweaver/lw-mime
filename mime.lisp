@@ -162,7 +162,7 @@
 
 (defun subheader (key field mime)
   (lw:when-let (header (header key mime))
-    (get-subheader-value (symbol-name field) header)))
+    (get-subheader-value (if (symbolp field) (symbol-name field) field) header)))
 
 (defun unfold-lines (lines)
   (let ((line (car lines)) (next (cadr lines)) (rest (cddr lines)))
@@ -225,31 +225,3 @@
         ((string-equal (caar list) (caadr list)) (merge-headers (cons (cons (caar list) (append (mklist (cdar list)) (mklist (cdadr list)))) (cddr list))))
         (t (cons (car list) (merge-headers (cdr list))))))
 
-(defun parse-body (body headers)
-  (if (starts-with (header :content-type headers) "multipart")
-      (mapcar (partial #'maybe-parse-part headers) (split-body-into-parts body (subheader :content-type :boundary headers)))
-      (decode-body body headers)))
-
-(defun maybe-parse-part (body headers)
-  (if (mismatch #(13 10) body :end2 (min (length body) 2))
-      (parse body)
-      (decode-body body headers)))
-
-(defun split-body-into-parts (array boundary)
-  (if boundary
-      (loop with split = (list* 13 10 45 45 (map 'list #'char-code boundary))
-            with split-len = (+ 4 (length boundary))
-            with start = 0
-            for pos = (search split array :start2 start)
-            nconc (trim-body-part array start pos)
-            if pos
-              do (setf start (+ pos split-len))
-            else
-              do (loop-finish))
-
-      (list array)))
-
-(defun trim-body-part (array start end)
-  (unless (or (eql start end) (not (mismatch #(45 45 13 10) array :start2 start :end2 end)))
-    ;; Remove the 13 10 from the start
-    (list (nsubseq array (+ start 2) end))))

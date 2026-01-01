@@ -18,6 +18,35 @@
     ("koi8-r" . :koi8-r))
   "Mapping of strings to supported encodings")
 
+(defun parse-body (body headers)
+  (if (starts-with (header :content-type headers) "multipart")
+      (mapcar (partial #'maybe-parse-part headers) (split-body-into-parts body (subheader :content-type :boundary headers)))
+      (decode-body body headers)))
+
+(defun maybe-parse-part (body headers)
+  (if (mismatch #(13 10) body :end2 (min (length body) 2))
+      (parse body)
+      (decode-body body headers)))
+
+(defun split-body-into-parts (array boundary)
+  (if boundary
+      (loop with split = (list* 13 10 45 45 (map 'list #'char-code boundary))
+            with split-len = (+ 4 (length boundary))
+            with start = 0
+            for pos = (search split array :start2 start)
+            nconc (trim-body-part array start pos)
+            if pos
+              do (setf start (+ pos split-len))
+            else
+              do (loop-finish))
+
+      (list array)))
+
+(defun trim-body-part (array start end)
+  (unless (or (eql start end) (not (mismatch #(45 45 13 10) array :start2 start :end2 end)))
+    ;; Remove the 13 10 from the start
+    (list (nsubseq array (+ start 2) end))))
+
 (defun decode-body (body headers)
   (let ((transfer-encoding (or (header :content-transfer-encoding headers) (header :transfer-encoding headers)))
         (content-type (header :content-type headers))
@@ -38,7 +67,7 @@
 
 (defun decode-transfer (body transfer-encoding)
   (cond ((null transfer-encoding) body)
-        ((starts-with transfer-encoding "base64") (crypto:decode-base-64 (ef:decode-external-string body :ascii)))
+        ((starts-with transfer-encoding "base64") (base64:decode-base-64 (ef:decode-external-string body :ascii)))
         ((starts-with transfer-encoding "quoted-printable") (decode-quoted-printable body))
         (t body)))
 
